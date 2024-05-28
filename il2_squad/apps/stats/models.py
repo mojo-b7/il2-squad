@@ -24,7 +24,7 @@ class IL2StatsServer(models.Model):
     This is a server that we scrape for mission results, e.g.
     http://ts3.virtualpilots.fi:8000/
     """
-    name = models.CharField(max_length=50)
+    name = models.CharField(max_length=50, unique=True)
     url = models.URLField()
 
     class Meta:
@@ -41,11 +41,16 @@ class PilotStatsPage(models.Model):
     """
     pilot = models.ForeignKey(User, on_delete=models.CASCADE)
     server = models.ForeignKey(IL2StatsServer, on_delete=models.CASCADE)
-    pilot_url = models.URLField(blank=True)
+    url = models.URLField()
 
     class Meta:
         verbose_name = "Pilot Stats Page"
         verbose_name_plural = "Pilot Stats Pages"
+
+    def clean(self):
+        # Ensure that there is no ?tour parameter in the URL; calling this URL
+        # without tour parameter will return the pilot's stats of the current tour.
+        self.url = self.url.split("?")[0]
 
     def __str__(self):
         return f"{self.pilot.username} - {self.server.name}"
@@ -81,7 +86,7 @@ class Sortie(ModelWithPoints):
     virtual_life = models.ForeignKey(VirtualLife, on_delete=models.CASCADE)
     date = models.DateField()
     time = models.TimeField()
-    aircraft = models.CharField(max_length=50)
+    aircraft = models.CharField(max_length=100)
     duration = models.DurationField()
     was_wounded = models.BooleanField()
     air_kills = models.IntegerField()
@@ -90,7 +95,7 @@ class Sortie(ModelWithPoints):
 
     # Tour and sortie ID are taken from the scraped site (il2stats)
     tour_id = models.IntegerField(default=0)
-    sortie_id = models.IntegerField(default=0)
+    sortie_id = models.IntegerField(default=0, unique=True)
 
     class Meta:
         ordering = ["virtual_life", "date", "time"]
