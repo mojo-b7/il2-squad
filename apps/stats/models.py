@@ -2,6 +2,21 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
+class ModelWithPoints(models.Model):
+    """
+    Abstract base class for models that store combat points.
+    """
+    class Meta:
+        abstract = True
+
+    sortie_points = models.DecimalField(decimal_places=2)
+    air_combat_points = models.DecimalField(decimal_places=2)
+    ground_combat_points = models.DecimalField(decimal_places=2)
+    ship_combat_points = models.DecimalField(decimal_places=2)
+    leadership_points = models.DecimalField(decimal_places=2)
+    nco_points = models.DecimalField(decimal_places=2)
+
+
 class IL2StatsServer(models.Model):
     """
     Model for a game server that provides stats via il2stats.
@@ -10,7 +25,7 @@ class IL2StatsServer(models.Model):
     http://ts3.virtualpilots.fi:8000/
     """
     name = models.CharField(max_length=50)
-    url = models.UrlField()
+    url = models.URLField()
 
     class Meta:
         verbose_name = "IL-2 Stats Server"
@@ -26,17 +41,17 @@ class PilotStatsPage(models.Model):
     """
     pilot = models.ForeignKey(User, on_delete=models.CASCADE)
     server = models.ForeignKey(IL2StatsServer, on_delete=models.CASCADE)
-    pilot_url = models.UrlField()
+    pilot_url = models.URLField(blank=True)
 
     class Meta:
         verbose_name = "Pilot Stats Page"
         verbose_name_plural = "Pilot Stats Pages"
 
     def __str__(self):
-        return f"{self.user.username} - {self.server.name}"
+        return f"{self.pilot.username} - {self.server.name}"
 
 
-class VirtualLife(models.Model):
+class VirtualLife(ModelWithPoints):
     """
     Model for a pilot's virtual life.
     """
@@ -51,24 +66,15 @@ class VirtualLife(models.Model):
     ground_kills = models.IntegerField()
     ship_kills = models.IntegerField()
 
-    # Points are float numbers, but we store them as integers to avoid rounding errors.
-    # To get a point from a stored value, divide by 100.
-    sortie_points = models.IntegerField()
-    air_combat_points = models.IntegerField()
-    ground_combat_points = models.IntegerField()
-    ship_combat_points = models.IntegerField()
-    leadership_points = models.IntegerField()
-    nco_points = models.IntegerField()
-
     class Meta:
         verbose_name_plural = "Virtual Lives"
         ordering = ["user", "number"]
 
     def __str__(self):
-        return f"{self.user.username} - {self.start_date} - {self.end_date}"
+        return f"{self.pilot.username} - {self.start_date} - {self.end_date}"
 
 
-class Sortie(models.Model):
+class Sortie(ModelWithPoints):
     """
     Model for a pilot's sortie.
     """
@@ -86,17 +92,8 @@ class Sortie(models.Model):
     tour_id = models.IntegerField(default=0)
     sortie_id = models.IntegerField(default=0)
 
-    # Points are float numbers, but we store them as integers to avoid rounding
-    # problems. To get a point from a stored value, divide by 100.
-    sortie_points = models.IntegerField()
-    air_combat_points = models.IntegerField()
-    ground_combat_points = models.IntegerField()
-    ship_combat_points = models.IntegerField()
-    leadership_points = models.IntegerField()
-    nco_points = models.IntegerField()
-
     class Meta:
         ordering = ["virtual_life", "date", "time"]
 
     def __str__(self):
-        return f"{self.virtual_life.user.username} - {self.date} - {self.time}"
+        return f"{self.virtual_life.pilot.username} - {self.date} - {self.time}"

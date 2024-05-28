@@ -19,3 +19,4 @@ static/**
 .idea/dataSources/**
 *.authkeys
 .venv
+.idea/
