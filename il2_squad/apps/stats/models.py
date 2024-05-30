@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-
+from scrapers import SCRAPER_OPTIONS, DEFAULT_SCRAPER_IDENTIFIER
 
 class ModelWithPoints(models.Model):
     """
@@ -26,6 +26,8 @@ class IL2StatsServer(models.Model):
     """
     name = models.CharField(max_length=50, unique=True)
     url = models.URLField()
+    scraper_type = models.CharField(max_length=50, choices=SCRAPER_OPTIONS, 
+                                    default=DEFAULT_SCRAPER_IDENTIFIER)
 
     class Meta:
         verbose_name = "IL-2 Stats Server"

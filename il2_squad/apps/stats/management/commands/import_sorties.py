@@ -9,6 +9,8 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.contrib.auth.models import User
+from stats.models import IL2StatsServer, PilotStatsPage, Tour, Sortie
+from scrapers import SCRAPER_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +21,9 @@ class Command(BaseCommand):
     help = "Import pilots' sortie data from il2stats websites."
 
     def add_arguments(self, parser):
+        """
+        Add command line arguments to the management command.
+        """
         parser.add_argument(
             "--pilot",
             type=str,
@@ -32,12 +37,13 @@ class Command(BaseCommand):
         parser.add_argument(
             "--tour",
             type=int,
-            help="Tour ID to import data from; if ommitted, all tours are checked for updates.",
+            help="Tour ID to import data from; if omitted, all tours are checked for updates.",
         )
 
-
     def handle(self, *args, **options):
-
+        """
+        Handle management command to import sortie data from il2stats websites.
+        """
         pilot = None
         server = None
 
@@ -46,10 +52,13 @@ class Command(BaseCommand):
         pilot_username = getattr(options, "pilot", None)
 
         # Limit the import to a single pilot?
-        if pilot_name:
+        if pilot_username:
             try:
                 pilot = User.objects.get(username=pilot_username)
                 logger.info(f"Importing sortie data for pilot: {pilot}")
+                for stats_page in PilotStatsPage.objects.filter(pilot=pilot):
+                    self.scrape_pilot_stats(pilot, stats_page.server, tour_id)
+
             except User.DoesNotExist:
                 raise CommandError(f"Pilot {pilot_username} does not exist.")
 
@@ -58,6 +67,8 @@ class Command(BaseCommand):
             try:
                 server = IL2StatsServer.objects.get(name=server_name)
                 logger.info(f"Importing sortie data from server: {server}")
+                for pilot in server.pilot_set.all():
+                    self.scrape_pilot_stats(pilot, server, tour_id)
             except IL2StatsServer.DoesNotExist:
                 raise CommandError(f"Server {server_name} does not exist.")
 
@@ -65,23 +76,21 @@ class Command(BaseCommand):
             # Get the server URL from the database
             # Scrape the server
 
-    def scrape_pilot(self, pilot, server, tour_id=None):
+    def scrape_pilot_stats(self, pilot, server, tour_id=None):
         """
-        Parse the pilot's stats page and import sortie data.
+        Parse a pilot's stats page on a particular server and import sortie data.
+        
+        @param pilot: User object representing the pilot.
+        @param server: IL2StatsServer object representing the server.
+        @param tour_id: Optional tour ID to import data from. If None, we import all unseen tours.
         """
         try:
             stats_page = PilotStatsPage.objects.get(pilot=pilot, server=server)
+            scraper = SCRAPER_MAP[server.scraper_type](stats_page)
         except PilotStatsPage.DoesNotExist:
             logger.error(f"No stats page found for pilot {pilot} on server {server}.")
             return
-
-        # Get the pilot's stats page
-        try:
-            response = requests.get(stats_page.url, timeout=REQUEST_TIMEOUT)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error while fetching {stats_page.url}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to initialize scraper: {e}")
             return
 
-        # Get available tours
-        if not tour_id:
-            tours = self.get_tours(response)
