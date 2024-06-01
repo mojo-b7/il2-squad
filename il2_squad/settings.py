@@ -109,6 +109,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'il2_squad.wsgi.application'
 
+# Custom path for admin. Makes sense to not have it in the default location.
+# No leading, but a trailing slash, please.
+ADMIN_PATH = 'site-admin/'
+
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases

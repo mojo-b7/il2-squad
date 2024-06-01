@@ -20,9 +20,9 @@ SCRAPER_OPTIONS = (
     (IL2STATS_SCRAPER_IDENTIFIER, "IL2Stats"),
 )
 
-# Map scraper names to their class names.
+# Map scraper names to a tuple of their module name and class name.
 SCRAPER_MAP = {
-    IL2STATS_SCRAPER_IDENTIFIER: "Il2StatsScraper",
+    IL2STATS_SCRAPER_IDENTIFIER: ("il2stats", "Il2StatsScraper"),
 }
 
 
@@ -30,11 +30,11 @@ def get_scraper_class(scraper_identifier):
     """
     Return a scraper class for a scraper identifier.
     """
-    scraper_class_name = SCRAPER_MAP.get(scraper_identifier)
-    if not scraper_class_name:
+    scraper_class_def = SCRAPER_MAP.get(scraper_identifier)
+    if not scraper_class_def:
         raise ValueError(f"Unknown scraper identifier: {scraper_identifier}")
-    module = importlib.import_module("scrapers")
-    scraper_class = getattr(module, scraper_class_name)
+    module = importlib.import_module(f".scrapers.{scraper_class_def[0]}", "stats")
+    scraper_class = getattr(module, scraper_class_def[1])
     return scraper_class
 
 

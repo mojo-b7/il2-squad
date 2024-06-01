@@ -1,6 +1,9 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
 from .scrapers import SCRAPER_OPTIONS, DEFAULT_SCRAPER_IDENTIFIER
+from django.utils.translation import gettext_lazy as _, gettext
+
 
 class ModelWithPoints(models.Model):
     """
@@ -17,7 +20,7 @@ class ModelWithPoints(models.Model):
     nco_points = models.DecimalField(decimal_places=2, max_digits=6)
 
 
-class IL2StatsServer(models.Model):
+class   IL2StatsServer(models.Model):
     """
     Model for a game server that provides stats via il2stats.
 
@@ -81,15 +84,28 @@ class VirtualLife(ModelWithPoints):
         return f"{self.pilot.username} - {self.start_date} - {self.end_date}"
 
 
+class Aircraft(models.Model):
+    """
+    Model for an aircraft in the game
+    """
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name_plural = "Aircraft"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Sortie(ModelWithPoints):
     """
     Model for a pilot's sortie.
     """
     virtual_life = models.ForeignKey(VirtualLife, on_delete=models.CASCADE)
-    date = models.DateField()
-    time = models.TimeField()
-    aircraft = models.CharField(max_length=100)
-    duration = models.DurationField()
+    aircraft = models.ForeignKey(Aircraft, on_delete=models.CASCADE)
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
     was_wounded = models.BooleanField()
     air_kills = models.IntegerField()
     ground_kills = models.IntegerField()
@@ -99,8 +115,17 @@ class Sortie(ModelWithPoints):
     tour_id = models.IntegerField(default=0)
     sortie_id = models.IntegerField(default=0, unique=True)
 
+    def clean(self):
+        # Ensure that there are no overlapping sorties for the same pilot.
+        if Sortie.objects.filter(
+            virtual_life__pilot=self.virtual_life.pilot,
+            start_at__lte=self.end_at,
+            end_at__gte=self.start_at,
+        ).exists():
+            raise ValidationError(gettext("Timely overlapping sortie already exists."))
+
     class Meta:
-        ordering = ["virtual_life", "date", "time"]
+        ordering = ["virtual_life", "start_at"]
 
     def __str__(self):
-        return f"{self.virtual_life.pilot.username} - {self.date} - {self.time}"
+        return f"{self.virtual_life.pilot.username} - {self.start_at}"
