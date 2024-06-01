@@ -15,7 +15,6 @@ class Il2StatsScraper(BaseScraper):
     """
     Scraper class for il2stats pages.
     """
-    identifier = "il2stats"
 
     def __init__(self, stats_page):
         super().__init__(stats_page)

@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from scrapers import SCRAPER_OPTIONS, DEFAULT_SCRAPER_IDENTIFIER
+from .scrapers import SCRAPER_OPTIONS, DEFAULT_SCRAPER_IDENTIFIER
 
 class ModelWithPoints(models.Model):
     """
@@ -9,12 +9,12 @@ class ModelWithPoints(models.Model):
     class Meta:
         abstract = True
 
-    sortie_points = models.DecimalField(decimal_places=2)
-    air_combat_points = models.DecimalField(decimal_places=2)
-    ground_combat_points = models.DecimalField(decimal_places=2)
-    ship_combat_points = models.DecimalField(decimal_places=2)
-    leadership_points = models.DecimalField(decimal_places=2)
-    nco_points = models.DecimalField(decimal_places=2)
+    sortie_points = models.DecimalField(decimal_places=2, max_digits=6)
+    air_combat_points = models.DecimalField(decimal_places=2, max_digits=6)
+    ground_combat_points = models.DecimalField(decimal_places=2, max_digits=6)
+    ship_combat_points = models.DecimalField(decimal_places=2, max_digits=6)
+    leadership_points = models.DecimalField(decimal_places=2, max_digits=6)
+    nco_points = models.DecimalField(decimal_places=2, max_digits=6)
 
 
 class IL2StatsServer(models.Model):
@@ -75,7 +75,7 @@ class VirtualLife(ModelWithPoints):
 
     class Meta:
         verbose_name_plural = "Virtual Lives"
-        ordering = ["user", "number"]
+        ordering = ["pilot", "-number"]
 
     def __str__(self):
         return f"{self.pilot.username} - {self.start_date} - {self.end_date}"

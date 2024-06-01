@@ -10,7 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.contrib.auth.models import User
 from stats.models import IL2StatsServer, PilotStatsPage, Tour, Sortie
-from scrapers import SCRAPER_MAP
+from scrapers import get_scraper_class
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ class Command(BaseCommand):
         """
         try:
             stats_page = PilotStatsPage.objects.get(pilot=pilot, server=server)
-            scraper = SCRAPER_MAP[server.scraper_type](stats_page)
+            scraper = get_scraper_class(server.scraper_type)(stats_page)
         except PilotStatsPage.DoesNotExist:
             logger.error(f"No stats page found for pilot {pilot} on server {server}.")
             return

@@ -22,7 +22,7 @@ def project_path_to(*parts):
     """
     Returns absolute path for ``parts`` relative to the path of this file.
     """
-    path = os.path.join(BASE_DIR, 'aiappconf', *parts)
+    path = os.path.join(BASE_DIR, 'il2_squad', *parts)
     return os.path.abspath(path) + "/"
 
 
@@ -45,6 +45,7 @@ NO_LOGGING = False
 
 if len(sys.argv) >= 2:
     DEVELOPER_MACHINE = (sys.argv[1] == 'runserver')
+    SITE_URL = "http://127.0.0.1:8000"
 
 DEBUG = DEVELOPER_MACHINE
 
@@ -73,6 +74,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'stats',
 ]
 
 MIDDLEWARE = [
@@ -113,8 +115,11 @@ WSGI_APPLICATION = 'il2_squad.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'il2squad',
+        'USER': 'markus',
+        'PASSWORD': 'password',
+        'HOST': 'localhost',
     }
 }
 
