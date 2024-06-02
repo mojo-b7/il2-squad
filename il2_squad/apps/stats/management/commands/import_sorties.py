@@ -91,6 +91,7 @@ class Command(BaseCommand):
         try:
             # Determine and initialize server specific scraper
             scraper = get_scraper_class(stats_page.server.scraper_type)(stats_page)
+            scraper.scrape(tour_id)
 
         except Exception as e:
             logger.error(f"Failed to initialize scraper: {e}")
