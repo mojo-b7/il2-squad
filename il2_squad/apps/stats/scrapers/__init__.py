@@ -49,14 +49,17 @@ class BaseScraper(object):
 
         This GETs the request page and parses its content with lxml.
         """
+        # The base class stores a reference to the stats page object, GETs and parses it.
         self.stats_page = stats_page
         response = requests.get(stats_page.url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         self.tree = html.fromstring(response.content)
         logger.info(f"Successfully loaded {stats_page.url}")
 
-    def scrape(self):
+    def scrape(self, tour_id=None):
         """
-        Scrape the stats page.
+        Scrape a pilot's stats page.
+
+        @param tour_id: Optional tour ID to scrape; if omitted, scrape all tours.
         """
         raise NotImplementedError()

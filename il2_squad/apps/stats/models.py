@@ -53,7 +53,7 @@ class PilotStatsPage(models.Model):
         verbose_name_plural = "Pilot Stats Pages"
 
     def clean(self):
-        # Ensure that there is no ?tour parameter in the URL; calling this URL
+        # Cut off eventual ?tour parameter from the URL; calling this URL
         # without tour parameter will return the pilot's stats of the current tour.
         self.url = self.url.split("?")[0]
 

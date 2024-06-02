@@ -58,8 +58,8 @@ class Command(BaseCommand):
             try:
                 pilot = User.objects.get(username=pilot_username)
                 logger.info(f"Importing sortie data for pilot: {pilot}")
-                for stats_page in PilotStatsPage.objects.filter(pilot=pilot):
-                    self.scrape_pilot_stats(pilot, stats_page.server, tour_id)
+                for stats_page in PilotStatsPage.objects.filter(pilot=pilot).select_related("server", "pilot"):
+                    self.scrape_pilot_stats(stats_page, tour_id)
 
             except User.DoesNotExist:
                 raise CommandError(f"Pilot {pilot_username} does not exist.")
@@ -69,16 +69,15 @@ class Command(BaseCommand):
             try:
                 server = IL2StatsServer.objects.get(name=server_name)
                 logger.info(f"Importing sortie data from server: {server}")
-                for pilot in server.pilot_set.all():
-                    self.scrape_pilot_stats(pilot, server, tour_id)
+                for stats_page in server.pilotstatspage_set.all():
+                    self.scrape_pilot_stats(stats_page, tour_id)
             except IL2StatsServer.DoesNotExist:
                 raise CommandError(f"Server {server_name} does not exist.")
 
         else:
             # Normal mode, check all servers and all pilots.
             for server in IL2StatsServer.objects.all():
-                for stats_page in server.pilotstatspage_set.all():
-                    logger.info(f"Importing sortie data for pilot {stats_page.pilot} on server {server}")
+                for stats_page in server.pilotstatspage_set.all().select_related("server", "pilot"):
                     self.scrape_pilot_stats(stats_page, tour_id)
 
     @staticmethod
@@ -90,7 +89,9 @@ class Command(BaseCommand):
         @param tour_id: Optional tour ID to import data from. If None, we import all unseen tours.
         """
         try:
+            # Determine and initialize server specific scraper
             scraper = get_scraper_class(stats_page.server.scraper_type)(stats_page)
+
         except Exception as e:
             logger.error(f"Failed to initialize scraper: {e}")
             return
