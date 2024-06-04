@@ -51,13 +51,17 @@ class Command(BaseCommand):
             response.raise_for_status()
             tree = html.fromstring(response.content)
             
-            self.scrape_coalition(tree, '//div[@class="online_players"]//div[@class="online_coal_1"]')
-            self.scrape_coalition(tree, '//div[@class="online_players"]//div[@class="online_coal_2"]')
+            self.scrape_coalition(server, tree, '//div[@class="online_players"]//div[@class="online_coal_1"]')
+            self.scrape_coalition(server, tree, '//div[@class="online_players"]//div[@class="online_coal_2"]')
 
     @staticmethod
-    def scrape_coalition(tree, xpath):
+    def scrape_coalition(server, tree, xpath):
         """
         Scrape a coalition of online players.
+        
+        @param server: IL2StatsServer object
+        @param tree: lxml tree object (parsed HTML page)
+        @param xpath: XPath to the root element of the coalition
         """
         # Get coalition root element
         root_el = tree.xpath(xpath)
@@ -79,7 +83,7 @@ class Command(BaseCommand):
         # Player list
         for row in root_el.xpath('./div[@class="content_table"]/a[@class="row"]'):
             href = row.get("href")
-            id_on_site = int(href.split("/")[-1])
+            id_on_site = int(href.strip("/").split("/")[-2])
             name = row.xpath('./div[@class="cell"]')[0].text
             logger.info(f"Player {name} ({id_on_site}) in coalition {coalition}")
             # Check if this player is already in the database
@@ -101,16 +105,15 @@ class Command(BaseCommand):
             member = User.objects.filter(username=name)
             if len(member):
                 pilot.squad_pilot = member[0]
+                
             pilot.save()
-            
-            # Check if name is known and up to date
-            pilot.set_current_name(name)
+            pilot.set_current_name(name, href)
             
             # Save occurrence
             PlayerOccurrence.objects.create(
                 pilot=pilot,
                 server=server,
                 coalition=coalition,
-                time=timezone.now(),
+                timestamp=timezone.now(),
             )
             

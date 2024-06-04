@@ -4,6 +4,8 @@ from django.contrib.auth.models import User
 from .scrapers import SCRAPER_OPTIONS, DEFAULT_SCRAPER_IDENTIFIER
 from django.utils.translation import gettext_lazy as _
 from urllib.parse import urlparse
+from django.utils import timezone
+
 
 # Coalition symbols
 COALITION_RED = "red"
@@ -180,18 +182,32 @@ class SomePilot(models.Model):
         verbose_name_plural = _("Some Pilots")
         ordering = ["site", "id_on_site"]
         
-    def set_current_name(self, name):
+    def set_current_name(self, name, url):
         """
         Set/update the current name if applicable.
+        
+        This also updates the `last_seen` timestamp.
+        
+        @param name: the name to set as current
+        @param url: pilot's URL on the site
         """
         current = self.somepilotname_set.filter(is_current=True).first()
         if current and current.name == name:
-            return  
-        name_rec, created = SomePilotName.objects.get_or_create(
-            name=name,
-            pilot=self,
-        )
-        name_rec.set_current()
+            current.last_seen=timezone.now()
+            current.save()
+            return
+          
+        name_rec = SomePilotName.objects.filter(name=name, pilot=self).first()
+        if name_rec:
+            name_rec.set_current()
+        else:
+            SomePilotName.objects.create(
+                name=name,
+                pilot=self,
+                first_seen=timezone.now(),
+                last_seen=timezone.now(),
+                url=url
+            )
         
     def name(self):
         """
@@ -221,7 +237,7 @@ class SomePilotName(models.Model):
     first_seen = models.DateTimeField()
     last_seen = models.DateTimeField()
     # Unfortunately, the URL to a player is name specific, so we need to store it here
-    ul = models.URLField()
+    url = models.URLField()
 
     is_current = models.BooleanField(default=True)
     
@@ -235,13 +251,18 @@ class SomePilotName(models.Model):
     def set_current(self):
         """
         Set this name as the current name of the pilot.
+        
+        This also updates the `last_seen` timestamp.
         """
-        if not self.is_current:
+        if self.is_current:
+            self.last_seen = timezone.now()
+        else:
             # Clear `is_current` for all other names
             SomePilotName.objects.filter(pilot=self.pilot, is_current=True).update(is_current=False)
             # Set this name as current
             self.is_current = True
-            self.save()
+            self.last_seen = timezone.now()
+        self.save()
         
     def __str__(self):
         return self.name
