@@ -2,7 +2,16 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
 from .scrapers import SCRAPER_OPTIONS, DEFAULT_SCRAPER_IDENTIFIER
-from django.utils.translation import gettext_lazy as _, gettext
+from django.utils.translation import gettext_lazy as _
+from urllib.parse import urlparse
+
+# Coalition symbols
+COALITION_RED = "red"
+COALITION_BLUE = "blue"
+COALITION_CHOICES = (
+    (COALITION_BLUE, "Blue"),
+    (COALITION_RED, "Red"), 
+)
 
 
 class ModelWithPoints(models.Model):
@@ -12,15 +21,21 @@ class ModelWithPoints(models.Model):
     class Meta:
         abstract = True
 
+    # Points for the sortie itself, depending on its length
     sortie_points = models.DecimalField(decimal_places=2, max_digits=6)
+    # Points for air combat (kills, assists, etc)
     air_combat_points = models.DecimalField(decimal_places=2, max_digits=6)
+    # Points for ground targets destroyed
     ground_combat_points = models.DecimalField(decimal_places=2, max_digits=6)
+    # Points for ships destroyed
     ship_combat_points = models.DecimalField(decimal_places=2, max_digits=6)
+    # Points for leadership
     leadership_points = models.DecimalField(decimal_places=2, max_digits=6)
+    # Points for NCO duties (e.g. assisting the flight leader)
     nco_points = models.DecimalField(decimal_places=2, max_digits=6)
 
 
-class   IL2StatsServer(models.Model):
+class IL2StatsServer(models.Model):
     """
     Model for a game server that provides stats via il2stats.
 
@@ -35,6 +50,17 @@ class   IL2StatsServer(models.Model):
     class Meta:
         verbose_name = "IL-2 Stats Server"
         verbose_name_plural = "IL-2 Stats Servers"
+        
+    def clean(self):
+        # Ensure the url is valid and is the base URL of the server
+        try:
+            url = urlparse(self.url)
+            scheme = url.scheme or "http"
+            self.url = f"{scheme}://{url.netloc}"
+            if url.port:
+                self.url += f":{url.port}"
+        except Exception as e:
+            raise ValidationError("Invalid URL: " + str(e))
 
     def __str__(self):
         return self.name
@@ -49,8 +75,8 @@ class PilotStatsPage(models.Model):
     url = models.URLField()
 
     class Meta:
-        verbose_name = "Pilot Stats Page"
-        verbose_name_plural = "Pilot Stats Pages"
+        verbose_name = _("Pilot Stats Page")
+        verbose_name_plural = _("Pilot Stats Pages")
 
     def clean(self):
         # Cut off eventual ?tour parameter from the URL; calling this URL
@@ -77,7 +103,8 @@ class VirtualLife(ModelWithPoints):
     ship_kills = models.IntegerField()
 
     class Meta:
-        verbose_name_plural = "Virtual Lives"
+        verbose_name = _("Virtual Life")
+        verbose_name_plural = _("Virtual Lives")
         ordering = ["pilot", "-number"]
 
     def __str__(self):
@@ -91,7 +118,8 @@ class Aircraft(models.Model):
     name = models.CharField(max_length=100)
 
     class Meta:
-        verbose_name_plural = "Aircraft"
+        verbose_name = _("Aircraft")
+        verbose_name_plural = _("Aircraft")
         ordering = ["name"]
 
     def __str__(self):
@@ -122,10 +150,118 @@ class Sortie(ModelWithPoints):
             start_at__lte=self.end_at,
             end_at__gte=self.start_at,
         ).exists():
-            raise ValidationError(gettext("Timely overlapping sortie already exists."))
+            raise ValidationError(_("Timely overlapping sortie already exists."))
 
     class Meta:
         ordering = ["virtual_life", "start_at"]
 
     def __str__(self):
         return f"{self.virtual_life.pilot.username} - {self.start_at}"
+
+
+class SomePilot(models.Model):
+    """
+    Model for some pilot.
+    
+    This is usually a pilot seen on the "online" page of the server, i.e. the page that lists
+    the current players. The pilot is not necessarily a member of this squad.
+    """
+    site = models.ForeignKey(IL2StatsServer, on_delete=models.CASCADE)
+    # User id of this pilot on the site we got him from
+    id_on_site = models.IntegerField(unique=True)
+    # How many times has this pilot been seen on the server?
+    red_occ_count = models.IntegerField(default=0, help_text=_("Number of times this pilot has been seen on the red side"))
+    blue_occ_count = models.IntegerField(default=0, help_text=_("Number of times this pilot has been seen on the blue side"))
+    # If the pilot is a member of this squad, we can link him to a user account
+    squad_pilot = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    class Meta:
+        verbose_name = _("Some Pilot")
+        verbose_name_plural = _("Some Pilots")
+        ordering = ["site", "id_on_site"]
+        
+    def set_current_name(self, name):
+        """
+        Set/update the current name if applicable.
+        """
+        current = self.somepilotname_set.filter(is_current=True).first()
+        if current and current.name == name:
+            return  
+        name_rec, created = SomePilotName.objects.get_or_create(
+            name=name,
+            pilot=self,
+        )
+        name_rec.set_current()
+        
+    def name(self):
+        """
+        Get the current name of this pilot.
+        
+        @return: the current name of this pilot
+        """
+        return self.somepilotname_set.filter(is_current=True).first().name
+        
+    def __str__(self):
+        return f'{self.id_on_site}'
+        
+        
+class SomePilotName(models.Model):
+    """
+    Name of a pilot that is not necessarily registered with this site or member of this squad.
+    
+    Reason for having this in a separate model is the fact that some pilots seem to like changing
+    their names every now and then. When I changed my name (joining a new squad), my history stayed, my ID
+    stayed, just the name changed. So I am assuming that the player ID is unique and tied to the IL-2 
+    game license or whatever. Having this in a separate model allows us to keep track of the names
+    pilots used in the past.
+    """
+    name = models.CharField(max_length=100)
+    pilot = models.ForeignKey(SomePilot, on_delete=models.CASCADE)
+    # When was this name first and last seen in the server's player list?
+    first_seen = models.DateTimeField()
+    last_seen = models.DateTimeField()
+    # Unfortunately, the URL to a player is name specific, so we need to store it here
+    ul = models.URLField()
+
+    is_current = models.BooleanField(default=True)
+    
+    class Meta:
+        verbose_name = _("Some pilot's name")
+        verbose_name_plural = _("Some pilot names")
+        ordering = ["-last_seen", "name"]
+        # Only one current name per pilot
+        unique_together = ["is_current", "pilot"]
+        
+    def set_current(self):
+        """
+        Set this name as the current name of the pilot.
+        """
+        if not self.is_current:
+            # Clear `is_current` for all other names
+            SomePilotName.objects.filter(pilot=self.pilot, is_current=True).update(is_current=False)
+            # Set this name as current
+            self.is_current = True
+            self.save()
+        
+    def __str__(self):
+        return self.name
+    
+    
+class PlayerOccurrence(models.Model):
+    """
+    Model that stores an occurrence of a player on a server.
+    """
+    server = models.ForeignKey(IL2StatsServer, on_delete=models.CASCADE)
+    pilot = models.ForeignKey(SomePilot, on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(auto_created=True)
+    coalition = models.CharField(max_length=10, choices=COALITION_CHOICES)
+    
+    class Meta:
+        verbose_name = _("Player Occurrence")
+        verbose_name_plural = _("Player Occurrences")
+        ordering = ["-timestamp", "server", "pilot"]
+        
+    def __str__(self):
+        return f"{self.pilot} on {self.server} at {self.timestamp}"
+
+

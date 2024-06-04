@@ -25,6 +25,17 @@
       "django": true,
       "autoStartBrowser": false,
       "program": "${workspaceFolder}/manage.py"
+    },
+    {
+      "name": "Debug: Import Online Players",
+      "type": "debugpy",
+      "request": "launch",
+      "args": [
+        "online_players"
+      ],
+      "django": true,
+      "autoStartBrowser": false,
+      "program": "${workspaceFolder}/manage.py"
     }
   ]
 }

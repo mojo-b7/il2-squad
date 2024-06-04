@@ -1,10 +1,7 @@
 """
 Import pilots' sortie data from il2stats websites.
-
 """
-
 import requests
-import lxml
 import logging
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
