@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 import sys
+from django.utils.log import DEFAULT_LOGGING
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,6 +47,8 @@ NO_LOGGING = False
 if len(sys.argv) >= 2:
     DEVELOPER_MACHINE = (sys.argv[1] == 'runserver')
     SITE_URL = "http://127.0.0.1:8000"
+    if DEVELOPER_MACHINE:
+        print("Development server running")
 
 DEBUG = DEVELOPER_MACHINE
 
@@ -166,6 +169,17 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "/profiles/login/"
 LOGOUT_URL = "/profiles/logout/"
 
+LOGGING = DEFAULT_LOGGING
+LOGGING["loggers"]["management"] = {
+    "handlers": ["django.server"],
+    "level": "INFO",
+    "propagate": False,
+}
+
+SQUAD_TAG = "JG27_"
+
+# --- NO SETTINGS BELOW THIS BLOCK -----------------------------------------------------------
+
 # import installation specific, local settings, if available
 try:
     from .local_settings import *
@@ -173,4 +187,4 @@ except ImportError:
     print("No local settings found.")
     pass
 
-# no settings below this line! -----------------------------------------------------------
+# --- NO SETTINGS BELOW THIS BLOCK -----------------------------------------------------------

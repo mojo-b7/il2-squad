@@ -12,7 +12,7 @@ from urllib.parse import urljoin
 from django.utils import timezone
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("management")
 
 REQUEST_TIMEOUT = getattr(settings, "REQUEST_TIMEOUT", 120)  # seconds; stats servers tend to be slow
 
@@ -69,6 +69,8 @@ class Command(BaseCommand):
             logger.error(f"Could not find node {xpath}")
             return
         root_el = root_el[0]
+
+        now = timezone.now()
         
         # header
         header = root_el.xpath('.//div[@class="header"]')
@@ -114,6 +116,6 @@ class Command(BaseCommand):
                 pilot=pilot,
                 server=server,
                 coalition=coalition,
-                timestamp=timezone.now(),
+                timestamp=now,
             )
             

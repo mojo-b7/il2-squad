@@ -281,7 +281,24 @@ class PlayerOccurrence(models.Model):
         verbose_name = _("Player Occurrence")
         verbose_name_plural = _("Player Occurrences")
         ordering = ["-timestamp", "server", "pilot"]
-        
+
+    def player_cnt_at(self, timestamp):
+        """
+        Get the number of players on the server at the given timestamp.
+
+        This is not 100% accurate, as we only poll/sample players at a given time. So this function
+        returns the number of players sample taken closest to the given timestamp.
+
+        Uses raw SQL to optimize speed.
+
+        @param timestamp: the timestamp to check
+        @return: dict with the number of players on the server at the given timestamp for each coalition
+        """
+        samples = PlayerOccurrence.objects.raw('SELECT * FROM stats_playeroccurrence WHERE server_id = %s AND timestamp <= %s ORDER BY timestamp DESC LIMIT 1', [self.server.id, timestamp])
+        red_cnt = PlayerOccurrence.objects.filter(server=self.server, coalition=COALITION_RED, timestamp__lte=timestamp).count()
+        blue_cnt = PlayerOccurrence.objects.filter(server=self.server, coalition=COALITION_BLUE, timestamp__lte=timestamp).count()
+        return {"red": red_cnt, "blue": blue_cnt}
+
     def __str__(self):
         return f"{self.pilot} on {self.server} at {self.timestamp}"
 

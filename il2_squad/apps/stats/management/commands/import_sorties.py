@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from stats.models import IL2StatsServer, PilotStatsPage, Sortie
 from stats.scrapers import get_scraper_class
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("management")
 
 REQUEST_TIMEOUT = getattr(settings, "REQUEST_TIMEOUT", 120)  # seconds; stats servers tend to be slow
 
