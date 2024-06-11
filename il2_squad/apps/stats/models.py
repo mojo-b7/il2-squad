@@ -292,11 +292,31 @@ class PlayerOccurrence(models.Model):
         Uses raw SQL to optimize speed.
 
         @param timestamp: the timestamp to check
-        @return: dict with the number of players on the server at the given timestamp for each coalition
+        @return: None if no samples could be found;
+                 dict with the number of players on the server at the given timestamp for each coalition
         """
-        samples = PlayerOccurrence.objects.raw('SELECT * FROM stats_playeroccurrence WHERE server_id = %s AND timestamp <= %s ORDER BY timestamp DESC LIMIT 1', [self.server.id, timestamp])
-        red_cnt = PlayerOccurrence.objects.filter(server=self.server, coalition=COALITION_RED, timestamp__lte=timestamp).count()
-        blue_cnt = PlayerOccurrence.objects.filter(server=self.server, coalition=COALITION_BLUE, timestamp__lte=timestamp).count()
+        # Get sample with timestamp closest to the given timestamp
+        samples = PlayerOccurrence.objects.raw(
+            """
+            SELECT * FROM stats_playeroccurrence 
+               WHERE server_id = %s AND timestamp <= %s 
+               ORDER BY timestamp 
+               DESC LIMIT 1
+            """, [self.server.id, timestamp])
+        if not len(samples):
+            return None
+
+        ts = samples[0].timestamp
+        # If the sample is off by more than a certain delta, ignore it
+        if abs(ts - timestamp) > timezone.timedelta(hours=1):
+            return None
+
+        red_cnt = PlayerOccurrence.objects.filter(
+            server=self.server, coalition=COALITION_RED, timestamp__lte=ts
+        ).count()
+        blue_cnt = PlayerOccurrence.objects.filter(
+            server=self.server, coalition=COALITION_BLUE, timestamp__lte=ts
+        ).count()
         return {"red": red_cnt, "blue": blue_cnt}
 
     def __str__(self):
