@@ -5,6 +5,7 @@ from .scrapers import SCRAPER_OPTIONS, DEFAULT_SCRAPER_IDENTIFIER
 from django.utils.translation import gettext_lazy as _
 from urllib.parse import urlparse
 from django.utils import timezone
+from django.conf import settings
 
 
 # Coalition symbols
@@ -271,6 +272,10 @@ class SomePilotName(models.Model):
 class PlayerOccurrence(models.Model):
     """
     Model that stores an occurrence of a player on a server.
+
+    This is used for tracking player counts on the server. The concept behind this assumes that whenever
+    players are polled, they are polled with a fixed timestamp, i.e. all players found when a poll is taken
+    are considered to be online at exactly the same time.
     """
     server = models.ForeignKey(IL2StatsServer, on_delete=models.CASCADE)
     pilot = models.ForeignKey(SomePilot, on_delete=models.CASCADE)
@@ -282,7 +287,31 @@ class PlayerOccurrence(models.Model):
         verbose_name_plural = _("Player Occurrences")
         ordering = ["-timestamp", "server", "pilot"]
 
-    def player_cnt_at(self, timestamp):
+    @classmethod
+    def closest_timestamp(cls, server, timestamp):
+        """
+        Get the closest timestamp to the given timestamp.
+
+        Put this in a separate function to allow for easier testing.
+
+        @param server: the server to check
+        @param timestamp: the timestamp to compare
+        @return: the closest timestamp
+        """
+        # Get sample with timestamp closest to the given timestamp
+        samples = PlayerOccurrence.objects.raw(
+            """
+            SELECT *, ABS(EXTRACT(EPOCH FROM (timestamp - %s))) AS diff
+            FROM stats_playeroccurrence
+            WHERE server_id = %s
+            ORDER BY diff
+            LIMIT 1;""", [timestamp, server.id])
+        if not len(samples):
+            return None
+        return samples[0].timestamp
+
+    @classmethod
+    def player_cnt_at(cls, server, timestamp):
         """
         Get the number of players on the server at the given timestamp.
 
@@ -291,33 +320,27 @@ class PlayerOccurrence(models.Model):
 
         Uses raw SQL to optimize speed.
 
+        @param server: the server to check
         @param timestamp: the timestamp to check
         @return: None if no samples could be found;
                  dict with the number of players on the server at the given timestamp for each coalition
         """
-        # Get sample with timestamp closest to the given timestamp
-        samples = PlayerOccurrence.objects.raw(
-            """
-            SELECT * FROM stats_playeroccurrence 
-               WHERE server_id = %s AND timestamp <= %s 
-               ORDER BY timestamp 
-               DESC LIMIT 1
-            """, [self.server.id, timestamp])
-        if not len(samples):
+
+        ts = cls.closest_timestamp(server, timestamp)
+        if not ts:
             return None
 
-        ts = samples[0].timestamp
         # If the sample is off by more than a certain delta, ignore it
-        if abs(ts - timestamp) > timezone.timedelta(hours=1):
+        if abs(ts - timestamp) > timezone.timedelta(minutes=getattr(settings, "PLAYER_OCCURRENCE_MAX_DELTA_MINUTES", 60)):
             return None
 
         red_cnt = PlayerOccurrence.objects.filter(
-            server=self.server, coalition=COALITION_RED, timestamp__lte=ts
+            server=server, coalition=COALITION_RED, timestamp=ts
         ).count()
         blue_cnt = PlayerOccurrence.objects.filter(
-            server=self.server, coalition=COALITION_BLUE, timestamp__lte=ts
+            server=server, coalition=COALITION_BLUE, timestamp=ts
         ).count()
-        return {"red": red_cnt, "blue": blue_cnt}
+        return {COALITION_RED: red_cnt, COALITION_BLUE: blue_cnt}
 
     def __str__(self):
         return f"{self.pilot} on {self.server} at {self.timestamp}"

@@ -177,6 +177,7 @@ LOGGING["loggers"]["management"] = {
 }
 
 SQUAD_TAG = "JG27_"
+PLAYER_OCCURRENCE_MAX_DELTA_MINUTES = 60
 
 # --- NO SETTINGS BELOW THIS BLOCK -----------------------------------------------------------
 
